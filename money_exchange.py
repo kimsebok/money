@@ -52,6 +52,8 @@ PREFERRED_FONT_FAMILIES = [
 SERIAL_PORTS = ["/dev/bill", "/dev/serial0", "/dev/ttyAMA0", "/dev/ttyS0", "/dev/ttyUSB0"]
 # 라즈비안 키오스크: True 시 전체화면 + 마우스 커서 숨김 (터치 전용)
 RASPBERRY_PI_KIOSK = True
+# Git 업데이트/재시작 시 작업 디렉터리
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 class MoneyExchanger:
@@ -543,6 +545,15 @@ class MoneyExchanger:
         right = tk.Frame(content, bg="#0b1020")
         right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
+        self.btn_admin_git_update = tk.Button(
+            right, text="Git 업데이트 후 재시작",
+            font=(self.font_family, 18, "bold"),
+            bg="#059669", fg="white",
+            width=22, height=1,
+            command=self._admin_git_update_restart
+        )
+        self.btn_admin_git_update.pack(pady=10)
+
         if _IS_LINUX:
             rf_frame = tk.Frame(right, bg="#0b1020")
             rf_frame.pack(pady=10)
@@ -648,16 +659,83 @@ class MoneyExchanger:
         self.sound.play_sound("button", wait=False)
         self.show_screen("idle")
 
+    def _admin_git_update_restart(self):
+        """관리자: git pull origin main 후 앱 재시작. 스레드에서 실행해 GUI가 멈추지 않도록 함."""
+        self.sound.play_sound("button", wait=False)
+        btn = getattr(self, "btn_admin_git_update", None)
+        if btn and btn.winfo_exists():
+            btn.config(state=tk.DISABLED, text="업데이트 중...")
+        result_holder = {}
+
+        def do_pull():
+            try:
+                r = subprocess.run(
+                    ["git", "pull", "origin", "main"],
+                    cwd=_PROJECT_ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                result_holder["returncode"] = r.returncode
+                result_holder["stdout"] = r.stdout or ""
+                result_holder["stderr"] = r.stderr or ""
+            except subprocess.TimeoutExpired:
+                result_holder["returncode"] = -1
+                result_holder["stdout"] = ""
+                result_holder["stderr"] = "시간 초과 (120초)"
+            except FileNotFoundError:
+                result_holder["returncode"] = -1
+                result_holder["stdout"] = ""
+                result_holder["stderr"] = "git 명령을 찾을 수 없습니다."
+            except Exception as e:
+                result_holder["returncode"] = -1
+                result_holder["stdout"] = ""
+                result_holder["stderr"] = str(e)
+            self.root.after(0, lambda: self._on_git_pull_done(result_holder, btn))
+
+        threading.Thread(target=do_pull, daemon=True).start()
+
+    def _on_git_pull_done(self, result_holder, btn):
+        ok = result_holder.get("returncode", -1) == 0
+        if ok:
+            if btn and btn.winfo_exists():
+                btn.config(text="재시작합니다...")
+            self.root.after(1500, self._do_restart_after_pull)
+        else:
+            if btn and btn.winfo_exists():
+                btn.config(state=tk.NORMAL, text="Git 업데이트 후 재시작")
+            err = result_holder.get("stderr", "").strip() or result_holder.get("stdout", "").strip() or "알 수 없는 오류"
+            try:
+                tk.messagebox.showerror("Git 업데이트 실패", err, parent=self.root)
+            except Exception:
+                pass
+
+    def _do_restart_after_pull(self):
+        """현재 앱 종료 후 동일 스크립트를 새 프로세스로 실행."""
+        try:
+            subprocess.Popen(
+                [sys.executable, os.path.abspath(__file__)],
+                cwd=_PROJECT_ROOT,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+        self.root.quit()
+        sys.exit(0)
+
     def _screensaver_config_path(self):
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), "screensaver_config.json")
 
     def _load_screensaver_enabled(self):
+        """설정이 있으면 그대로 사용, 없으면 기본값 OFF."""
         try:
             with open(self._screensaver_config_path(), "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return bool(data.get("enabled", True))
+                return bool(data.get("enabled", False))
         except Exception:
-            return True
+            return False
 
     def _save_screensaver_enabled(self, enabled):
         try:
@@ -939,32 +1017,41 @@ class MoneyExchanger:
             self.show_password_dialog()
 
     def show_password_dialog(self):
-        """Display admin password keypad dialog. 세로 600px 이내."""
-        dlg = tk.Toplevel(self.root)
-        dlg.geometry("420x560")
-        dlg.resizable(False, False)
-        dlg.overrideredirect(True)
-        dlg.grab_set()
+        """비밀번호 키패드 다이얼로그. Toplevel 대신 root 위 Frame 오버레이로 표시해 Linux에서 포커스가 확실히 동작하도록 함."""
+        overlay = tk.Frame(self.root, bg="#1a1a2e")
+        overlay.place(relwidth=1, relheight=1, x=0, y=0)
+
+        card = tk.Frame(overlay, bg="#0b1020", width=420, height=560)
+        card.place(relx=0.5, rely=0.5, anchor="c")
+        card.pack_propagate(False)
 
         tk.Label(
-            dlg, text="비밀번호를 입력하세요",
-            font=(self.font_family, 20)
+            card, text="비밀번호를 입력하세요",
+            font=(self.font_family, 20), bg="#0b1020", fg="white"
         ).pack(pady=(16, 10))
 
         pw_var = tk.StringVar()
-        entry = tk.Entry(dlg, textvariable=pw_var, show="*", font=(self.font_family, 20), width=10)
+        entry = tk.Entry(card, textvariable=pw_var, show="*", font=(self.font_family, 20), width=10)
         entry.pack(pady=8)
-        entry.focus_set()
+
+        def close():
+            overlay.place_forget()
+            overlay.destroy()
+
+        def _focus_entry():
+            entry.focus_set()
+
+        self.root.after(50, _focus_entry)
 
         def submit():
             if pw_var.get() == self.admin_password:
-                dlg.destroy()
+                close()
                 self.show_screen("admin")
             else:
                 pw_var.set("")
                 entry.focus_set()
 
-        keypad = tk.Frame(dlg)
+        keypad = tk.Frame(card, bg="#0b1020")
         keypad.pack(pady=8)
 
         def add_digit(d):
@@ -996,26 +1083,28 @@ class MoneyExchanger:
 
         for idx, (label, cmd) in enumerate(buttons):
             r, c = divmod(idx, 3)
-            tk.Button(
+            b = tk.Button(
                 keypad, text=label,
                 font=(self.font_family, 18),
                 width=5, height=2,
-                command=cmd
-            ).grid(row=r, column=c, padx=5, pady=5)
+                command=cmd,
+                takefocus=0,
+            )
+            b.grid(row=r, column=c, padx=5, pady=5)
 
-        btn_frame = tk.Frame(dlg)
+        btn_frame = tk.Frame(card, bg="#0b1020")
         btn_frame.pack(pady=8)
 
         tk.Button(
             btn_frame, text="확인",
             font=(self.font_family, 26),
-            width=7, height=2, command=submit
+            width=7, height=2, command=submit, takefocus=0
         ).pack(side=tk.LEFT, padx=6)
 
         tk.Button(
             btn_frame, text="취소",
             font=(self.font_family, 26),
-            width=7, height=2, command=dlg.destroy
+            width=7, height=2, command=close, takefocus=0
         ).pack(side=tk.LEFT, padx=6)
 
     # =====================================================

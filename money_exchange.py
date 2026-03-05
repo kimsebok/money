@@ -54,6 +54,13 @@ SERIAL_PORTS = ["/dev/bill", "/dev/serial0", "/dev/ttyAMA0", "/dev/ttyS0", "/dev
 RASPBERRY_PI_KIOSK = True
 # Git 업데이트/재시작 시 작업 디렉터리
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+# 전자락 GPIO (BCM 17). 라즈베리 파이 전용
+LOCK_GPIO_PIN = 17
+
+try:
+    import RPi.GPIO as _GPIO
+except ImportError:
+    _GPIO = None
 
 
 class MoneyExchanger:
@@ -67,7 +74,8 @@ class MoneyExchanger:
         if _IS_LINUX and RASPBERRY_PI_KIOSK:
             self._kiosk_active = True
             self.root.bind("<Escape>", self._exit_kiosk)
-            self.root.after(400, self._apply_kiosk)
+            # 부팅 직후 입력 장치 준비 전에 커서를 숨기지 않도록 1.5초 지연
+            self.root.after(1500, self._apply_kiosk)
 
         # 상태 변수
         self.total_money = 0
@@ -133,7 +141,7 @@ class MoneyExchanger:
         self.serial.start()
 
     def _apply_kiosk(self):
-        """창이 뜬 뒤 키오스크(전체화면·커서숨김) 적용. 라즈비안에서 초기 적용이 무시되는 경우 대비."""
+        """창이 뜬 뒤 키오스크(전체화면·커서숨김) 적용. 부팅 직후 입력 준비를 위해 지연 후 호출됨."""
         if not getattr(self, "_kiosk_active", False):
             return
         try:
@@ -501,11 +509,11 @@ class MoneyExchanger:
         volume_frame = tk.Frame(left, bg="#0b1020")
         volume_frame.pack(pady=10)
 
-        tk.Label(
-            volume_frame, text="볼륨",
-            font=(self.font_family, 18, "bold"),
-            fg="white", bg="#0b1020"
-        ).pack(pady=(0, 8))
+        # tk.Label(
+        #     volume_frame, text="볼륨",
+        #     font=(self.font_family, 18, "bold"),
+        #     fg="white", bg="#0b1020"
+        # ).pack(pady=(0, 8))
 
         tk.Scale(
             volume_frame,
@@ -555,33 +563,6 @@ class MoneyExchanger:
         self.btn_admin_git_update.pack(pady=10)
 
         if _IS_LINUX:
-            rf_frame = tk.Frame(right, bg="#0b1020")
-            rf_frame.pack(pady=10)
-            tk.Label(
-                rf_frame, text="WiFi / Bluetooth",
-                font=(self.font_family, 18, "bold"),
-                fg="white", bg="#0b1020"
-            ).pack(pady=(0, 8))
-            rf_btn_f = tk.Frame(rf_frame, bg="#0b1020")
-            rf_btn_f.pack()
-            self.btn_admin_wifi = tk.Button(
-                rf_btn_f, text="WiFi",
-                font=(self.font_family, 16, "bold"),
-                bg="#6366f1", fg="white",
-                width=12, height=1,
-                command=self._admin_wifi_toggle
-            )
-            self.btn_admin_wifi.pack(side=tk.LEFT, padx=8)
-            self.btn_admin_bluetooth = tk.Button(
-                rf_btn_f, text="Bluetooth",
-                font=(self.font_family, 16, "bold"),
-                bg="#6366f1", fg="white",
-                width=14, height=1,
-                command=self._admin_bluetooth_toggle
-            )
-            self.btn_admin_bluetooth.pack(side=tk.LEFT, padx=8)
-            self._update_rf_button_states()
-
             # 거리 센서 (TOF050C): on/off, 거리(10~50cm) 조절
             sensor_frame = tk.Frame(right, bg="#0b1020")
             sensor_frame.pack(pady=10)
@@ -627,6 +608,14 @@ class MoneyExchanger:
                 width=22, height=2,
                 command=self._admin_shutdown_with_sound
             ).pack(pady=15)
+
+            tk.Button(
+                right, text="잠금해제",
+                font=(self.font_family, 20, "bold"),
+                bg="#2563eb", fg="white",
+                width=22, height=2,
+                command=self._admin_unlock_with_sound
+            ).pack(pady=10)
 
         # 하단 중앙: 나가기
         bottom = tk.Frame(f, bg="#0b1020")
@@ -781,98 +770,33 @@ class MoneyExchanger:
         else:
             self.btn_admin_sensor.config(bg="#b91c1c", text="센서: OFF")
 
-    def _rfkill_soft_blocked(self, device):
-        """rfkill으로 device(wifi/bluetooth)의 Soft blocked 여부. True=OFF, False=ON, None=알 수 없음."""
-        try:
-            out = subprocess.run(
-                ["rfkill", "list", device],
-                timeout=3,
-                capture_output=True,
-                text=True,
-            )
-            if out.returncode != 0 or not out.stdout:
-                return None
-            if "Soft blocked: yes" in out.stdout:
-                return True
-            if "Soft blocked: no" in out.stdout:
-                return False
-        except Exception:
-            pass
-        return None
-
-    def _update_rf_button_states(self):
-        """WiFi/Bluetooth 버튼을 상태에 따라 ON=파란색, OFF=빨간색으로 갱신. 메인 스레드에서만 호출."""
-        if not _IS_LINUX:
-            return
-        blue, red = "#6366f1", "#b91c1c"
-        if hasattr(self, "btn_admin_wifi") and self.btn_admin_wifi.winfo_exists():
-            blocked = self._rfkill_soft_blocked("wifi")
-            if blocked is False:
-                self.btn_admin_wifi.config(bg=blue, text="WiFi: ON")
-            elif blocked is True:
-                self.btn_admin_wifi.config(bg=red, text="WiFi: OFF")
-            else:
-                self.btn_admin_wifi.config(bg="#64748b", text="WiFi")
-        if hasattr(self, "btn_admin_bluetooth") and self.btn_admin_bluetooth.winfo_exists():
-            blocked = self._rfkill_soft_blocked("bluetooth")
-            if blocked is False:
-                self.btn_admin_bluetooth.config(bg=blue, text="Bluetooth: ON")
-            elif blocked is True:
-                self.btn_admin_bluetooth.config(bg=red, text="Bluetooth: OFF")
-            else:
-                self.btn_admin_bluetooth.config(bg="#64748b", text="Bluetooth")
-
-    def _admin_wifi_toggle(self):
-        """라즈비안: WiFi on/off 토글 (rfkill)."""
-        self.sound.play_sound("button", wait=False)
-
-        def _run():
-            try:
-                subprocess.run(
-                    ["sudo", "rfkill", "toggle", "wifi"],
-                    timeout=5,
-                    capture_output=True,
-                )
-            except Exception:
-                try:
-                    subprocess.run(
-                        ["rfkill", "toggle", "wifi"],
-                        timeout=5,
-                        capture_output=True,
-                    )
-                except Exception:
-                    pass
-            self.root.after(0, self._update_rf_button_states)
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def _admin_bluetooth_toggle(self):
-        """라즈비안: Bluetooth on/off 토글 (rfkill)."""
-        self.sound.play_sound("button", wait=False)
-
-        def _run():
-            try:
-                subprocess.run(
-                    ["sudo", "rfkill", "toggle", "bluetooth"],
-                    timeout=5,
-                    capture_output=True,
-                )
-            except Exception:
-                try:
-                    subprocess.run(
-                        ["rfkill", "toggle", "bluetooth"],
-                        timeout=5,
-                        capture_output=True,
-                    )
-                except Exception:
-                    pass
-            self.root.after(0, self._update_rf_button_states)
-
-        threading.Thread(target=_run, daemon=True).start()
-
     def _admin_shutdown_with_sound(self):
         self.sound.play_sound("button", wait=False)
         self._confirm_shutdown_pi()
+
+    def _admin_unlock_with_sound(self):
+        """관리자: 잠금해제 버튼 — 버튼 소리 후 GPIO 17로 전자락 1초간 해제 (스레드에서 실행)."""
+        self.sound.play_sound("button", wait=False)
+        if not _IS_LINUX or _GPIO is None:
+            return
+
+        def _do_unlock():
+            try:
+                _GPIO.setmode(_GPIO.BCM)
+                _GPIO.setup(LOCK_GPIO_PIN, _GPIO.OUT, initial=_GPIO.LOW)
+                _GPIO.output(LOCK_GPIO_PIN, _GPIO.HIGH)
+                import time
+                time.sleep(0.3)
+                _GPIO.output(LOCK_GPIO_PIN, _GPIO.LOW)
+            except Exception:
+                pass
+            finally:
+                try:
+                    _GPIO.cleanup()
+                except Exception:
+                    pass
+
+        threading.Thread(target=_do_unlock, daemon=True).start()
 
     def _confirm_shutdown_pi(self):
         """라즈베리 파이 전원 끄기 확인 후 실행."""

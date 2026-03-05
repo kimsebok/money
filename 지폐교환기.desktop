@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=지폐 교환기
+Comment=지폐 교환기 키오스크 앱
+Exec=python3 /home/se/money/money_exchange.py
+Path=/home/se/money
+Icon=python3
+Terminal=false
+StartupNotify=true
+Categories=Utility;Finance;

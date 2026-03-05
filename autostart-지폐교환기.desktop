@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=지폐 교환기 (부팅 시 자동실행)
+Comment=입력 장치 준비 후 지폐 교환기 실행 (터치/마우스 지연 대기)
+Exec=/home/se/money/start_money_exchange.sh
+Path=/home/se/money
+Icon=python3
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

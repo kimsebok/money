@@ -91,11 +91,11 @@ def load_sensor_config():
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             return {
-                "enabled": bool(data.get("enabled", True)),
+                "enabled": bool(data.get("enabled", False)),
                 "threshold_cm": max(10, min(50, int(data.get("threshold_cm", 50)))),
             }
     except Exception:
-        return {"enabled": True, "threshold_cm": 50}
+        return {"enabled": False, "threshold_cm": 50}
 
 
 def save_sensor_config(enabled, threshold_cm):

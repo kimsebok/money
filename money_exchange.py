@@ -86,6 +86,8 @@ class MoneyExchanger:
         self.selected_1000 = 0
         self.is_processing = False
         self.admin_clicks = 0
+        self.restart_hotspot_clicks = 0
+        self.exit_hotspot_clicks = 0
         self.admin_password = "2857"
         self.is_acceptor_disabled = False
         # Linux 기본 폰트(라즈비안 포함), Windows는 맑은고딕
@@ -234,9 +236,33 @@ class MoneyExchanger:
         self.current_screen = name
         if name != "idle":
             self.admin_clicks = 0
+            self.restart_hotspot_clicks = 0
+            self.exit_hotspot_clicks = 0
+            if hasattr(self, "idle_restart_btn"):
+                try:
+                    self.idle_restart_btn.place_forget()
+                except Exception:
+                    pass
+            if hasattr(self, "idle_exit_btn"):
+                try:
+                    self.idle_exit_btn.place_forget()
+                except Exception:
+                    pass
             if hasattr(self, "stop_idle_corner_animation"):
                 self.stop_idle_corner_animation()
         else:
+            self.restart_hotspot_clicks = 0
+            self.exit_hotspot_clicks = 0
+            if hasattr(self, "idle_restart_btn"):
+                try:
+                    self.idle_restart_btn.place_forget()
+                except Exception:
+                    pass
+            if hasattr(self, "idle_exit_btn"):
+                try:
+                    self.idle_exit_btn.place_forget()
+                except Exception:
+                    pass
             self.update_idle_status()
             if self.current_screen != "idle":
                 return
@@ -318,6 +344,29 @@ class MoneyExchanger:
         )
         self.idle_info_label.pack(pady=10)
 
+        idle_restart_hotspot = tk.Button(
+            f,
+            text="",
+            bg="#000231",
+            activebackground="#000231",
+            borderwidth=0,
+            highlightthickness=0,
+            command=self.on_restart_hotspot_click,
+        )
+        idle_restart_hotspot.place(relx=0.0, x=10, y=10, anchor="nw", width=100, height=100)
+
+        self.idle_restart_btn = tk.Button(
+            f,
+            text="재시작",
+            font=(self.font_family, 16, "bold"),
+            bg="#1e3a8a",
+            activebackground="#1d4ed8",
+            fg="white",
+            borderwidth=0,
+            highlightthickness=0,
+            command=self._on_idle_restart_click,
+        )
+
         admin_btn = tk.Button(
             f,
             text="",
@@ -328,6 +377,31 @@ class MoneyExchanger:
             command=self.on_admin_click
         )
         admin_btn.place(relx=1.0, x=-10, y=10, anchor="ne", width=100, height=100)
+
+        idle_exit_hotspot = tk.Button(
+            f,
+            text="",
+            bg="#000231",
+            activebackground="#000231",
+            borderwidth=0,
+            highlightthickness=0,
+            command=self.on_exit_hotspot_click,
+        )
+        idle_exit_hotspot.place(
+            relx=0.0, rely=1.0, x=10, y=-10, anchor="sw", width=100, height=100
+        )
+
+        self.idle_exit_btn = tk.Button(
+            f,
+            text="종료",
+            font=(self.font_family, 16, "bold"),
+            bg="#991b1b",
+            activebackground="#b91c1c",
+            fg="white",
+            borderwidth=0,
+            highlightthickness=0,
+            command=self._on_idle_exit_click,
+        )
 
         return f
 
@@ -699,7 +773,7 @@ class MoneyExchanger:
             except Exception:
                 pass
 
-    def _do_restart_after_pull(self):
+    def _restart_app(self):
         """현재 앱 종료 후 동일 스크립트를 새 프로세스로 실행."""
         try:
             subprocess.Popen(
@@ -711,6 +785,43 @@ class MoneyExchanger:
             )
         except Exception:
             pass
+        self.root.quit()
+        sys.exit(0)
+
+    def _do_restart_after_pull(self):
+        """Git pull 후 앱 재시작."""
+        self._restart_app()
+
+    def on_restart_hotspot_click(self):
+        """메인(idle) 왼쪽 상단 5회 탭 시 재시작 버튼 표시."""
+        if getattr(self, "current_screen", "") != "idle":
+            return
+        self.restart_hotspot_clicks += 1
+        if self.restart_hotspot_clicks >= 5:
+            self.restart_hotspot_clicks = 0
+            if hasattr(self, "idle_restart_btn") and self.idle_restart_btn.winfo_exists():
+                self.idle_restart_btn.place(
+                    relx=0.0, x=10, y=10, anchor="nw", width=100, height=100
+                )
+
+    def _on_idle_restart_click(self):
+        self.sound.play_sound("button", wait=False)
+        self._restart_app()
+
+    def on_exit_hotspot_click(self):
+        """메인(idle) 왼쪽 하단 5회 탭 시 종료 버튼 표시."""
+        if getattr(self, "current_screen", "") != "idle":
+            return
+        self.exit_hotspot_clicks += 1
+        if self.exit_hotspot_clicks >= 5:
+            self.exit_hotspot_clicks = 0
+            if hasattr(self, "idle_exit_btn") and self.idle_exit_btn.winfo_exists():
+                self.idle_exit_btn.place(
+                    relx=0.0, rely=1.0, x=10, y=-10, anchor="sw", width=100, height=100
+                )
+
+    def _on_idle_exit_click(self):
+        self.sound.play_sound("button", wait=False)
         self.root.quit()
         sys.exit(0)
 

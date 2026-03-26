@@ -4,7 +4,7 @@ from tkinter import messagebox
 import gpiozero # 혹은 lgpio 사용 가능
 from time import sleep
 
-# GPIO 설정 (GPIO 18번 핀 사용)
+# GPIO 설정 (GPIO 17번 핀 사용)
 # 회로 보호를 위해 Relay나 MOSFET 제어용 OutputDevice 선언
 lock = gpiozero.OutputDevice(17, active_high=True, initial_value=False)
 

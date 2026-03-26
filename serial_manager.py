@@ -1,13 +1,10 @@
 import threading
-import time
 
 import serial
 
 
 class BillSerialManager:
     """Handle bill acceptor/dispenser serial communications."""
-    _MAX_RX_BUFFER = 2048
-    _TAIL_KEEP_BYTES = 64
 
     def __init__(self, root, port, on_bill_detected, on_error=None):
         self.root = root
@@ -104,28 +101,14 @@ class BillSerialManager:
             try:
                 if not self.ser or not self.ser.is_open:
                     break
-                waiting = self.ser.in_waiting
-                if waiting:
-                    data = self.ser.read(waiting)
-                else:
-                    # timeout 기반 1바이트 블로킹 읽기: 바쁜 루프 방지
-                    data = self.ser.read(1)
+                data = self.ser.read(self.ser.in_waiting) if self.ser.in_waiting else None
                 if data:
                     self.rx_buffer.extend(data)
-                    if len(self.rx_buffer) > self._MAX_RX_BUFFER:
-                        # 비정상/잡음 누적 보호: 최근 일부만 유지
-                        del self.rx_buffer[:-self._TAIL_KEEP_BYTES]
                     self._parse_bill_packet(self.rx_buffer)
-                else:
-                    # timeout=0.5 이후 빈 응답일 때 CPU 점유 완화
-                    time.sleep(0.01)
             except Exception:
-                time.sleep(0.05)
+                pass
 
     def _parse_bill_packet(self, buffer):
-        if len(buffer) > self._MAX_RX_BUFFER:
-            del buffer[:-self._TAIL_KEEP_BYTES]
-
         while buffer and buffer[0] in (0x11, 0xEE):
             del buffer[0]
 
@@ -141,12 +124,7 @@ class BillSerialManager:
         # 정해진 형식: 33 0B 05 18 + 카운트 (14바이트)
         header = bytes.fromhex("33 0B 05 18")
         idx = buffer.find(header)
-        if idx == -1:
-            # 헤더가 없으면 버퍼가 계속 커지지 않게 꼬리만 보존
-            if len(buffer) > self._TAIL_KEEP_BYTES:
-                del buffer[:-self._TAIL_KEEP_BYTES]
-            return
-        if len(buffer) < idx + 14:
+        if idx == -1 or len(buffer) < idx + 14:
             return
 
         packet = buffer[idx:idx + 14]

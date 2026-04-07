@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 import tkinter as tk
 
+from display_config import DISPLAY_HEIGHT, DISPLAY_WIDTH, fs
+
 _IS_LINUX = sys.platform.startswith("linux")
 
 
@@ -54,7 +56,7 @@ class ScreenSaverController:
         label = tk.Label(
             frame,
             text=self.label_text,
-            font=(self.font_family, 32, "bold"),
+            font=(self.font_family, fs(32), "bold"),
             fg="#e5e7eb",
             bg="black",
         )
@@ -143,8 +145,8 @@ class ScreenSaverController:
     def _move_label(self):
         if not self._move_running or not self._label:
             return
-        width = self.root.winfo_width() or 1024
-        height = self.root.winfo_height() or 600
+        width = self.root.winfo_width() or DISPLAY_WIDTH
+        height = self.root.winfo_height() or DISPLAY_HEIGHT
         label_w = self._label.winfo_reqwidth()
         label_h = self._label.winfo_reqheight()
         max_x = max(self.config.move_padding_px, width - label_w - self.config.move_padding_px)

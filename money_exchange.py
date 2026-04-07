@@ -36,6 +36,7 @@ if _IS_LINUX:
 import tkinter as tk
 import tkinter.font as tkfont
 
+from display_config import DISPLAY_HEIGHT, DISPLAY_WIDTH, ch, cw, fs, px
 from screensaver import ScreenSaverConfig, ScreenSaverController
 from gif_player import GifPlayer
 from sound_manager import SoundManager
@@ -68,7 +69,7 @@ class MoneyExchanger:
         """Initialize UI, state, and hardware interfaces."""
         self.root = root
         self.root.title("지폐 교환기")
-        self.root.geometry("1024x600+0+0")
+        self.root.geometry(f"{DISPLAY_WIDTH}x{DISPLAY_HEIGHT}+0+0")
         self.root.resizable(False, False)
         self._kiosk_active = False
         if _IS_LINUX and RASPBERRY_PI_KIOSK:
@@ -96,7 +97,7 @@ class MoneyExchanger:
         self.load_custom_fonts()
         self.sound = SoundManager(self.root, self.volume_var)
         self.sound.load_sounds()
-        screensaver_config = ScreenSaverConfig()
+        screensaver_config = ScreenSaverConfig(move_padding_px=px(20))
         self.screensaver = ScreenSaverController(
             self.root,
             screensaver_config,
@@ -290,16 +291,16 @@ class MoneyExchanger:
 
         tk.Label(
             f, text="♪천원 OK! ♪오천원 OK! ♪만원 OK!",
-            font=(self.font_family, 36, "bold"),
+            font=(self.font_family, fs(36), "bold"),
             fg="#facc15", bg="#000231"
-        ).pack(pady=(60, 10))
+        ).pack(pady=(px(60), px(10)))
 
         self.idle_title_label = tk.Label(
             f, text="동전 교환기",
-            font=(self.custom_font_family, 150, "bold"),
+            font=(self.custom_font_family, fs(150), "bold"),
             fg="white", bg="#000231"
         )
-        self.idle_title_label.pack(pady=40)
+        self.idle_title_label.pack(pady=px(40))
 
         gif_dir = os.path.join(os.path.dirname(__file__), "resource", "gif")
 
@@ -312,24 +313,26 @@ class MoneyExchanger:
         self.idle_corner_label = self.idle_corner_player.create_label(f)
         self.idle_corner_left_label = self.idle_corner_left_player.create_label(f)
         # 우하 / 좌하 배치
-        self.idle_corner_label.place(relx=1.0, rely=1.0, x=-40, y=-40, anchor="se")
-        self.idle_corner_left_label.place(x=40, rely=1.0, y=-40, anchor="sw")
+        self.idle_corner_label.place(
+            relx=1.0, rely=1.0, x=-px(40, "x"), y=-px(40), anchor="se"
+        )
+        self.idle_corner_left_label.place(x=px(40, "x"), rely=1.0, y=-px(40), anchor="sw")
 
-        self.idle_status_font_normal = (self.font_family, 38)
-        self.idle_status_font_disabled = (self.font_family, 80, "bold")
+        self.idle_status_font_normal = (self.font_family, fs(38))
+        self.idle_status_font_disabled = (self.font_family, fs(80), "bold")
         self.idle_status_label = tk.Label(
             f, text="지폐를 넣어주세요",
             font=self.idle_status_font_normal,
             fg="#e5e7eb", bg="#000231"
         )
-        self.idle_status_label.pack(pady=10)
+        self.idle_status_label.pack(pady=px(10))
 
         self.idle_info_label = tk.Label(
             f, text="김세복 대추밀냉면",
-            font=(self.font_family, 28),
+            font=(self.font_family, fs(28)),
             fg="#9ca3af", bg="#000231"
         )
-        self.idle_info_label.pack(pady=10)
+        self.idle_info_label.pack(pady=px(10))
 
         idle_restart_hotspot = tk.Button(
             f,
@@ -340,14 +343,21 @@ class MoneyExchanger:
             highlightthickness=0,
             command=self.on_restart_hotspot_click,
         )
-        idle_restart_hotspot.place(relx=0.0, x=10, y=10, anchor="nw", width=100, height=100)
+        idle_restart_hotspot.place(
+            relx=0.0,
+            x=px(10, "x"),
+            y=px(10),
+            anchor="nw",
+            width=px(100, "x"),
+            height=px(100),
+        )
 
-        self.idle_restart_exit_frame = tk.Frame(f, width=100, height=100, bg="#000231")
+        self.idle_restart_exit_frame = tk.Frame(f, width=px(100, "x"), height=px(100), bg="#000231")
         self.idle_restart_exit_frame.pack_propagate(False)
         self.idle_restart_btn = tk.Button(
             self.idle_restart_exit_frame,
             text="재시작",
-            font=(self.font_family, 14, "bold"),
+            font=(self.font_family, fs(14), "bold"),
             bg="#1e3a8a",
             activebackground="#1d4ed8",
             fg="white",
@@ -359,7 +369,7 @@ class MoneyExchanger:
         self.idle_exit_btn = tk.Button(
             self.idle_restart_exit_frame,
             text="종료",
-            font=(self.font_family, 14, "bold"),
+            font=(self.font_family, fs(14), "bold"),
             bg="#991b1b",
             activebackground="#b91c1c",
             fg="white",
@@ -378,7 +388,14 @@ class MoneyExchanger:
             highlightthickness=0,
             command=self.on_admin_click
         )
-        admin_btn.place(relx=1.0, x=-10, y=10, anchor="ne", width=100, height=100)
+        admin_btn.place(
+            relx=1.0,
+            x=-px(10, "x"),
+            y=px(10),
+            anchor="ne",
+            width=px(100, "x"),
+            height=px(100),
+        )
 
         return f
 
@@ -395,65 +412,65 @@ class MoneyExchanger:
 
         self.ui_amount = tk.Label(
             top, text="0원",
-            font=(self.font_family, 68, "bold"),
+            font=(self.font_family, fs(68), "bold"),
             fg="#facc15", bg="#111827"
         )
-        self.ui_amount.pack(pady=(30, 10))
+        self.ui_amount.pack(pady=(px(30), px(10)))
 
         tk.Label(
             top, text="반환 받으실 1000원권 장수를 선택해 주세요",
-            font=(self.font_family, 24),
+            font=(self.font_family, fs(24)),
             fg="white", bg="#111827"
-        ).pack(pady=(0, 10))
+        ).pack(pady=(0, px(10)))
 
         mid = tk.Frame(top, bg="#111827")
-        mid.pack(pady=10)
+        mid.pack(pady=px(10))
 
         self.btn_minus = tk.Button(
             mid, text="-",
-            font=(self.font_family, 52, "bold"),
-            width=4, height=2,
+            font=(self.font_family, fs(52), "bold"),
+            width=cw(4), height=ch(2),
             bg="#2563eb", fg="white",
             command=self.decrease_1000
         )
-        self.btn_minus.pack(side=tk.LEFT, padx=20)
+        self.btn_minus.pack(side=tk.LEFT, padx=px(20, "x"))
 
         self.ui_1000 = tk.Label(
             mid, text="0 장",
-            font=(self.font_family, 72, "bold"),
+            font=(self.font_family, fs(72), "bold"),
             fg="white", bg="#111827"
         )
         self.ui_1000.pack(side=tk.LEFT)
 
         self.btn_plus = tk.Button(
             mid, text="+",
-            font=(self.font_family, 52, "bold"),
-            width=4, height=2,
+            font=(self.font_family, fs(52), "bold"),
+            width=cw(4), height=ch(2),
             bg="#2563eb", fg="white",
             command=self.increase_1000
         )
-        self.btn_plus.pack(side=tk.LEFT, padx=20)
+        self.btn_plus.pack(side=tk.LEFT, padx=px(20, "x"))
 
         self.ui_500 = tk.Label(
             top, text="500원 x 0",
-            font=(self.font_family, 26),
+            font=(self.font_family, fs(26)),
             fg="#9ca3af", bg="#111827"
         )
-        self.ui_500.pack(pady=10)
+        self.ui_500.pack(pady=px(10))
 
         # 하단 고정 영역 (버튼 절대 안 잘림)
-        bottom = tk.Frame(f, bg="#111827", height=120)
+        bottom = tk.Frame(f, bg="#111827", height=px(120))
         bottom.pack(fill=tk.X)
         bottom.pack_propagate(False)
 
         self.btn_confirm = tk.Button(
             bottom, text="확인",
-            font=(self.font_family, 44, "bold"),
+            font=(self.font_family, fs(44), "bold"),
             bg="#16a34a", fg="white",
-            height=2, width=12,
+            height=ch(2), width=cw(12),
             command=self.confirm_change
         )
-        self.btn_confirm.pack(pady=20)
+        self.btn_confirm.pack(pady=px(20))
 
         return f
 
@@ -466,15 +483,15 @@ class MoneyExchanger:
 
         tk.Label(
             f, text="교환 중입니다…",
-            font=(self.font_family, 60, "bold"),
+            font=(self.font_family, fs(60), "bold"),
             fg="black", bg="#fcf0e4"
-        ).pack(pady=40)
+        ).pack(pady=px(40))
 
         tk.Label(
             f, text="잠시만 기다려 주세요",
-            font=(self.font_family, 35),
+            font=(self.font_family, fs(35)),
             fg="#515151", bg="#fcf0e4"
-        ).pack(pady=10)
+        ).pack(pady=px(10))
 
         gif_dir = os.path.join(os.path.dirname(__file__), "resource", "gif")
         gif_path = os.path.join(gif_dir, "gif_loading.gif")
@@ -487,7 +504,7 @@ class MoneyExchanger:
 
         self.processing_player = GifPlayer(self.root, gif_path, bg="#fcf0e4")
         self.processing_gif_label = self.processing_player.create_label(f)
-        self.processing_gif_label.pack(pady=20)
+        self.processing_gif_label.pack(pady=px(20))
 
         return f
 
@@ -516,7 +533,7 @@ class MoneyExchanger:
         #             break
         self.thanks_player = GifPlayer(self.root, gif_path, bg="#fcf0e3")
         self.thanks_gif_label = self.thanks_player.create_label(f)
-        self.thanks_gif_label.pack(pady=(100, 40))
+        self.thanks_gif_label.pack(pady=(px(100), px(40)))
 
         return f
 
@@ -533,7 +550,7 @@ class MoneyExchanger:
         f = tk.Frame(self.root, bg="#0b1020")
 
         content = tk.Frame(f, bg="#0b1020")
-        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        content.pack(fill=tk.BOTH, expand=True, padx=px(20, "x"), pady=px(20))
 
         # 왼쪽 절반
         left = tk.Frame(content, bg="#0b1020")
@@ -541,24 +558,24 @@ class MoneyExchanger:
 
         self.btn_admin_reset = tk.Button(
             left, text="올 리셋 (투입기/배출기)",
-            font=(self.font_family, 20, "bold"),
+            font=(self.font_family, fs(20), "bold"),
             bg="#1d4ed8", fg="white",
-            width=22, height=2,
+            width=cw(22), height=ch(2),
             command=self._admin_reset_with_sound
         )
-        self.btn_admin_reset.pack(pady=15)
+        self.btn_admin_reset.pack(pady=px(15))
 
         self.btn_admin_toggle = tk.Button(
             left, text="사용중지: OFF",
-            font=(self.font_family, 20, "bold"),
+            font=(self.font_family, fs(20), "bold"),
             bg="#334155", fg="white",
-            width=22, height=2,
+            width=cw(22), height=ch(2),
             command=self._admin_toggle_with_sound
         )
-        self.btn_admin_toggle.pack(pady=15)
+        self.btn_admin_toggle.pack(pady=px(15))
 
         volume_frame = tk.Frame(left, bg="#0b1020")
-        volume_frame.pack(pady=10)
+        volume_frame.pack(pady=px(10))
 
         # tk.Label(
         #     volume_frame, text="볼륨",
@@ -570,8 +587,8 @@ class MoneyExchanger:
             volume_frame,
             from_=0, to=100,
             orient=tk.HORIZONTAL,
-            length=350,
-            width=50,
+            length=px(350, "x"),
+            width=px(50),
             showvalue=True,
             variable=self.volume_var,
             command=lambda _val: self.sound.apply_volume(),
@@ -583,21 +600,21 @@ class MoneyExchanger:
 
         tk.Button(
             volume_frame, text="테스트",
-            font=(self.font_family, 16, "bold"),
+            font=(self.font_family, fs(16), "bold"),
             bg="#22c55e", fg="white",
-            width=10, height=1,
+            width=cw(10), height=ch(1),
             command=self._admin_volume_test_with_sound
-        ).pack(pady=15)
+        ).pack(pady=px(15))
 
         # 스크린세이버 on/off
         self.btn_admin_screensaver = tk.Button(
             left, text="스크린세이버: ON",
-            font=(self.font_family, 18, "bold"),
+            font=(self.font_family, fs(18), "bold"),
             bg="#6366f1", fg="white",
-            width=22, height=1,
+            width=cw(22), height=ch(1),
             command=self._admin_screensaver_toggle
         )
-        self.btn_admin_screensaver.pack(pady=10)
+        self.btn_admin_screensaver.pack(pady=px(10))
         self._update_screensaver_button_state()
 
         # 오른쪽 절반
@@ -606,35 +623,35 @@ class MoneyExchanger:
 
         self.btn_admin_git_update = tk.Button(
             right, text="Git 업데이트 후 재시작",
-            font=(self.font_family, 18, "bold"),
+            font=(self.font_family, fs(18), "bold"),
             bg="#059669", fg="white",
-            width=22, height=1,
+            width=cw(22), height=ch(1),
             command=self._admin_git_update_restart
         )
-        self.btn_admin_git_update.pack(pady=10)
+        self.btn_admin_git_update.pack(pady=px(10))
 
         if _IS_LINUX:
             # 거리 센서 (TOF050C): on/off, 거리(10~50cm) 조절
             sensor_frame = tk.Frame(right, bg="#0b1020")
-            sensor_frame.pack(pady=10)
+            sensor_frame.pack(pady=px(10))
             tk.Label(
                 sensor_frame, text="거리 센서 (대기 타이머 리셋)",
-                font=(self.font_family, 18, "bold"),
+                font=(self.font_family, fs(18), "bold"),
                 fg="white", bg="#0b1020"
-            ).pack(pady=(0, 8))
+            ).pack(pady=(0, px(8)))
             self.btn_admin_sensor = tk.Button(
                 sensor_frame, text="센서: ON",
-                font=(self.font_family, 16, "bold"),
+                font=(self.font_family, fs(16), "bold"),
                 bg="#6366f1", fg="white",
-                width=14, height=1,
+                width=cw(14), height=ch(1),
                 command=self._admin_sensor_toggle
             )
-            self.btn_admin_sensor.pack(pady=(0, 6))
+            self.btn_admin_sensor.pack(pady=(0, px(6)))
             tk.Label(
                 sensor_frame, text="감지 거리 (cm)",
-                font=(self.font_family, 14),
+                font=(self.font_family, fs(14)),
                 fg="white", bg="#0b1020"
-            ).pack(pady=(0, 4))
+            ).pack(pady=(0, px(4)))
             self.sensor_threshold_var = tk.IntVar(
                 value=self.distance_sensor.get_threshold_cm()
             )
@@ -642,7 +659,7 @@ class MoneyExchanger:
                 sensor_frame,
                 from_=10, to=50,
                 orient=tk.HORIZONTAL,
-                length=280,
+                length=px(280, "x"),
                 showvalue=True,
                 variable=self.sensor_threshold_var,
                 command=self._admin_sensor_threshold_changed,
@@ -654,29 +671,29 @@ class MoneyExchanger:
 
             tk.Button(
                 right, text="전원 끄기",
-                font=(self.font_family, 20, "bold"),
+                font=(self.font_family, fs(20), "bold"),
                 bg="#b91c1c", fg="white",
-                width=22, height=2,
+                width=cw(22), height=ch(2),
                 command=self._admin_shutdown_with_sound
-            ).pack(pady=15)
+            ).pack(pady=px(15))
 
             tk.Button(
                 right, text="잠금해제",
-                font=(self.font_family, 20, "bold"),
+                font=(self.font_family, fs(20), "bold"),
                 bg="#2563eb", fg="white",
-                width=22, height=2,
+                width=cw(22), height=ch(2),
                 command=self._admin_unlock_with_sound
-            ).pack(pady=10)
+            ).pack(pady=px(10))
 
         # 하단 중앙: 나가기
         bottom = tk.Frame(f, bg="#0b1020")
-        bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=15)
+        bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=px(15))
         tk.Frame(bottom, bg="#0b1020").pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         tk.Button(
             bottom, text="나가기",
-            font=(self.font_family, 20, "bold"),
+            font=(self.font_family, fs(20), "bold"),
             bg="#0f172a", fg="white",
-            width=22, height=2,
+            width=cw(22), height=ch(2),
             command=self._admin_exit_with_sound
         ).pack(side=tk.LEFT)
         tk.Frame(bottom, bg="#0b1020").pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -781,7 +798,12 @@ class MoneyExchanger:
                 and self.idle_restart_exit_frame.winfo_exists()
             ):
                 self.idle_restart_exit_frame.place(
-                    relx=0.0, x=10, y=10, anchor="nw", width=100, height=100
+                    relx=0.0,
+                    x=px(10, "x"),
+                    y=px(10),
+                    anchor="nw",
+                    width=px(100, "x"),
+                    height=px(100),
                 )
 
     def _on_idle_restart_click(self):
@@ -881,16 +903,16 @@ class MoneyExchanger:
         """라즈베리 파이 전원 끄기 확인 후 실행."""
         dlg = tk.Toplevel(self.root)
         dlg.title("전원 끄기")
-        dlg.geometry("320x140")
+        dlg.geometry(f"{px(320, 'x')}x{px(140)}")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
         tk.Label(
             dlg, text="라즈베리 파이 전원을 끄시겠습니까?",
-            font=(self.font_family, 14), wraplength=280
-        ).pack(pady=(20, 15))
+            font=(self.font_family, fs(14)), wraplength=px(280, "x")
+        ).pack(pady=(px(20), px(15)))
         btn_f = tk.Frame(dlg)
-        btn_f.pack(pady=10)
+        btn_f.pack(pady=px(10))
 
         def do_shutdown():
             dlg.destroy()
@@ -913,13 +935,13 @@ class MoneyExchanger:
 
         tk.Button(
             btn_f, text="예, 전원 끄기",
-            font=(self.font_family, 12), bg="#b91c1c", fg="white",
-            width=14, command=do_shutdown
-        ).pack(side=tk.LEFT, padx=8)
+            font=(self.font_family, fs(12)), bg="#b91c1c", fg="white",
+            width=cw(14), command=do_shutdown
+        ).pack(side=tk.LEFT, padx=px(8, "x"))
         tk.Button(
             btn_f, text="취소",
-            font=(self.font_family, 12), width=10, command=dlg.destroy
-        ).pack(side=tk.LEFT, padx=8)
+            font=(self.font_family, fs(12)), width=cw(10), command=dlg.destroy
+        ).pack(side=tk.LEFT, padx=px(8, "x"))
 
     def build_error_screen(self):
         """Build the error screen layout."""
@@ -936,21 +958,21 @@ class MoneyExchanger:
 
         self.error_no_player = GifPlayer(self.root, gif_path, bg="#7f1d1d")
         self.error_no_label = self.error_no_player.create_label(f)
-        self.error_no_label.pack(pady=(80, 20))
+        self.error_no_label.pack(pady=(px(80), px(20)))
 
         tk.Label(
             f, text="현재 사용 중지",
-            font=(self.font_family, 80, "bold"),
+            font=(self.font_family, fs(80), "bold"),
             fg="white", bg="#7f1d1d"
-        ).pack(pady=(10, 20))
+        ).pack(pady=(px(10), px(20)))
 
         tk.Label(
             f,
             text="죄송합니다. 빠른 조치 하겠습니다.\n-김세복대추밀냉면",
-            font=(self.font_family, 22),
+            font=(self.font_family, fs(22)),
             fg="white", bg="#7f1d1d",
             justify="center"
-        ).pack(pady=30)
+        ).pack(pady=px(30))
 
         admin_btn = tk.Button(
             f,
@@ -961,7 +983,14 @@ class MoneyExchanger:
             highlightthickness=0,
             command=self.on_admin_click
         )
-        admin_btn.place(relx=1.0, x=-10, y=10, anchor="ne", width=100, height=100)
+        admin_btn.place(
+            relx=1.0,
+            x=-px(10, "x"),
+            y=px(10),
+            anchor="ne",
+            width=px(100, "x"),
+            height=px(100),
+        )
 
         return f
 
@@ -1010,7 +1039,7 @@ class MoneyExchanger:
                 )
             if hasattr(self, "idle_title_label"):
                 self.idle_title_label.pack_forget()
-                self.idle_title_label.pack(pady=40, before=self.idle_status_label)
+                self.idle_title_label.pack(pady=px(40), before=self.idle_status_label)
 
     def on_admin_click(self):
         """Handle hidden admin entry clicks."""
@@ -1024,18 +1053,20 @@ class MoneyExchanger:
         overlay = tk.Frame(self.root, bg="#1a1a2e")
         overlay.place(relwidth=1, relheight=1, x=0, y=0)
 
-        card = tk.Frame(overlay, bg="#0b1020", width=420, height=560)
+        card = tk.Frame(overlay, bg="#0b1020", width=px(420, "x"), height=px(560))
         card.place(relx=0.5, rely=0.5, anchor="c")
         card.pack_propagate(False)
 
         tk.Label(
             card, text="비밀번호를 입력하세요",
-            font=(self.font_family, 20), bg="#0b1020", fg="white"
-        ).pack(pady=(16, 10))
+            font=(self.font_family, fs(20)), bg="#0b1020", fg="white"
+        ).pack(pady=(px(16), px(10)))
 
         pw_var = tk.StringVar()
-        entry = tk.Entry(card, textvariable=pw_var, show="*", font=(self.font_family, 20), width=10)
-        entry.pack(pady=8)
+        entry = tk.Entry(
+            card, textvariable=pw_var, show="*", font=(self.font_family, fs(20)), width=cw(10)
+        )
+        entry.pack(pady=px(8))
 
         def close():
             overlay.place_forget()
@@ -1055,7 +1086,7 @@ class MoneyExchanger:
                 entry.focus_set()
 
         keypad = tk.Frame(card, bg="#0b1020")
-        keypad.pack(pady=8)
+        keypad.pack(pady=px(8))
 
         def add_digit(d):
             pw_var.set(pw_var.get() + str(d))
@@ -1088,27 +1119,27 @@ class MoneyExchanger:
             r, c = divmod(idx, 3)
             b = tk.Button(
                 keypad, text=label,
-                font=(self.font_family, 18),
-                width=5, height=2,
+                font=(self.font_family, fs(18)),
+                width=cw(5), height=ch(2),
                 command=cmd,
                 takefocus=0,
             )
-            b.grid(row=r, column=c, padx=5, pady=5)
+            b.grid(row=r, column=c, padx=px(5, "x"), pady=px(5))
 
         btn_frame = tk.Frame(card, bg="#0b1020")
-        btn_frame.pack(pady=8)
+        btn_frame.pack(pady=px(8))
 
         tk.Button(
             btn_frame, text="확인",
-            font=(self.font_family, 26),
-            width=7, height=2, command=submit, takefocus=0
-        ).pack(side=tk.LEFT, padx=6)
+            font=(self.font_family, fs(26)),
+            width=cw(7), height=ch(2), command=submit, takefocus=0
+        ).pack(side=tk.LEFT, padx=px(6, "x"))
 
         tk.Button(
             btn_frame, text="취소",
-            font=(self.font_family, 26),
-            width=7, height=2, command=close, takefocus=0
-        ).pack(side=tk.LEFT, padx=6)
+            font=(self.font_family, fs(26)),
+            width=cw(7), height=ch(2), command=close, takefocus=0
+        ).pack(side=tk.LEFT, padx=px(6, "x"))
 
     # =====================================================
     # 버튼 로직

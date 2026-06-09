@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import threading
+from datetime import datetime, timedelta
 
 # 플랫폼: 라즈비안/리눅스 자동 감지 (Windows는 "nt")
 _IS_LINUX = sys.platform.startswith("linux")
@@ -55,6 +56,8 @@ SERIAL_PORTS = ["/dev/bill", "/dev/serial0", "/dev/ttyAMA0", "/dev/ttyS0", "/dev
 RASPBERRY_PI_KIOSK = True
 # Git 업데이트/재시작 시 작업 디렉터리
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+# 매일 자동 git pull 후 재시작 (라즈비안 키오스크). None이면 비활성화.
+SCHEDULED_GIT_UPDATE_TIME = (7, 0)  # (시, 분) — 매일 07:00
 # 전자락 GPIO (BCM 17). 라즈베리 파이 전용
 LOCK_GPIO_PIN = 17
 
@@ -131,6 +134,7 @@ class MoneyExchanger:
             self.root, SERIAL_PORTS, self.on_bill_detected, self.show_error_screen
         )
         self.root.after(800, self._start_serial)
+        self._start_scheduled_git_update()
 
     def _start_serial(self):
         """시리얼 포트 열기 (지연 후 실행). 실패 시 한 번 더 재시도."""
@@ -716,13 +720,36 @@ class MoneyExchanger:
         self.sound.play_sound("button", wait=False)
         self.show_screen("idle")
 
+    def _start_scheduled_git_update(self):
+        """Linux 키오스크: 매일 지정 시각에 git pull 후 재시작."""
+        if not _IS_LINUX or not SCHEDULED_GIT_UPDATE_TIME:
+            return
+        self._schedule_next_git_update()
+
+    def _schedule_next_git_update(self):
+        hour, minute = SCHEDULED_GIT_UPDATE_TIME
+        now = datetime.now()
+        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        delay_ms = max(1000, int((target - now).total_seconds() * 1000))
+        self.root.after(delay_ms, self._run_scheduled_git_update)
+
+    def _run_scheduled_git_update(self):
+        self._schedule_next_git_update()
+        self._git_pull_and_restart(scheduled=True)
+
     def _admin_git_update_restart(self):
         """관리자: git pull origin main 후 앱 재시작. 스레드에서 실행해 GUI가 멈추지 않도록 함."""
-        self.sound.play_sound("button", wait=False)
         btn = getattr(self, "btn_admin_git_update", None)
-        if btn and btn.winfo_exists():
-            btn.config(state=tk.DISABLED, text="업데이트 중...")
-        result_holder = {}
+        self._git_pull_and_restart(admin_btn=btn)
+
+    def _git_pull_and_restart(self, *, admin_btn=None, scheduled=False):
+        if not scheduled:
+            self.sound.play_sound("button", wait=False)
+        if admin_btn and admin_btn.winfo_exists():
+            admin_btn.config(state=tk.DISABLED, text="업데이트 중...")
+        result_holder = {"scheduled": scheduled}
 
         def do_pull():
             try:
@@ -748,24 +775,41 @@ class MoneyExchanger:
                 result_holder["returncode"] = -1
                 result_holder["stdout"] = ""
                 result_holder["stderr"] = str(e)
-            self.root.after(0, lambda: self._on_git_pull_done(result_holder, btn))
+            self.root.after(
+                0,
+                lambda: self._on_git_pull_done(result_holder, admin_btn),
+            )
 
         threading.Thread(target=do_pull, daemon=True).start()
 
+    def _log_scheduled_git_update(self, message):
+        log_path = os.path.join(_PROJECT_ROOT, "git_update.log")
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat(timespec='seconds')} {message}\n")
+        except OSError:
+            pass
+
     def _on_git_pull_done(self, result_holder, btn):
         ok = result_holder.get("returncode", -1) == 0
+        scheduled = result_holder.get("scheduled", False)
         if ok:
             if btn and btn.winfo_exists():
                 btn.config(text="재시작합니다...")
+            if scheduled:
+                self._log_scheduled_git_update("git pull 성공, 재시작합니다.")
             self.root.after(1500, self._do_restart_after_pull)
         else:
             if btn and btn.winfo_exists():
                 btn.config(state=tk.NORMAL, text="Git 업데이트 후 재시작")
             err = result_holder.get("stderr", "").strip() or result_holder.get("stdout", "").strip() or "알 수 없는 오류"
-            try:
-                tk.messagebox.showerror("Git 업데이트 실패", err, parent=self.root)
-            except Exception:
-                pass
+            if scheduled:
+                self._log_scheduled_git_update(f"git pull 실패: {err}")
+            else:
+                try:
+                    tk.messagebox.showerror("Git 업데이트 실패", err, parent=self.root)
+                except Exception:
+                    pass
 
     def _restart_app(self):
         """현재 앱 종료 후 동일 스크립트를 새 프로세스로 실행."""

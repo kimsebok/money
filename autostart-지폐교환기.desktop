@@ -2,8 +2,8 @@
 Version=1.0
 Type=Application
 Name=지폐 교환기 (부팅 시 자동실행)
-Comment=입력 장치 준비 후 지폐 교환기 실행 (터치/마우스 지연 대기)
-Exec=/home/se/money/start_money_exchange.sh
+Comment=부팅 시 지폐 교환기 자동 실행 (앱 시작 5초 후 git 업데이트)
+Exec=python3 /home/se/money/money_exchange.py
 Path=/home/se/money
 Icon=python3
 Terminal=false

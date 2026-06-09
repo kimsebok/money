@@ -58,6 +58,10 @@ RASPBERRY_PI_KIOSK = True
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # 매일 자동 git pull 후 재시작 (라즈비안 키오스크). None이면 비활성화.
 SCHEDULED_GIT_UPDATE_TIME = (7, 0)  # (시, 분) — 매일 07:00
+# 부팅 후 앱 시작 N ms 뒤 git pull 후 재시작. None이면 비활성화.
+BOOT_GIT_UPDATE_DELAY_MS = 5000
+_SKIP_BOOT_GIT_UPDATE_ARG = "--skip-boot-git-update"
+_SKIP_BOOT_GIT_UPDATE = _SKIP_BOOT_GIT_UPDATE_ARG in sys.argv
 # 전자락 GPIO (BCM 17). 라즈베리 파이 전용
 LOCK_GPIO_PIN = 17
 
@@ -135,6 +139,7 @@ class MoneyExchanger:
         )
         self.root.after(800, self._start_serial)
         self._start_scheduled_git_update()
+        self._start_boot_git_update()
 
     def _start_serial(self):
         """시리얼 포트 열기 (지연 후 실행). 실패 시 한 번 더 재시도."""
@@ -720,6 +725,16 @@ class MoneyExchanger:
         self.sound.play_sound("button", wait=False)
         self.show_screen("idle")
 
+    def _start_boot_git_update(self):
+        """Linux 부팅 직후: 앱 시작 후 지정 시간 뒤 git pull 후 재시작 (1회)."""
+        if not _IS_LINUX or not BOOT_GIT_UPDATE_DELAY_MS or _SKIP_BOOT_GIT_UPDATE:
+            return
+        self.root.after(BOOT_GIT_UPDATE_DELAY_MS, self._run_boot_git_update)
+
+    def _run_boot_git_update(self):
+        self._log_scheduled_git_update("부팅 후 자동 git pull 시작")
+        self._git_pull_and_restart(scheduled=True)
+
     def _start_scheduled_git_update(self):
         """Linux 키오스크: 매일 지정 시각에 git pull 후 재시작."""
         if not _IS_LINUX or not SCHEDULED_GIT_UPDATE_TIME:
@@ -815,7 +830,11 @@ class MoneyExchanger:
         """현재 앱 종료 후 동일 스크립트를 새 프로세스로 실행."""
         try:
             subprocess.Popen(
-                [sys.executable, os.path.abspath(__file__)],
+                [
+                    sys.executable,
+                    os.path.abspath(__file__),
+                    _SKIP_BOOT_GIT_UPDATE_ARG,
+                ],
                 cwd=_PROJECT_ROOT,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,

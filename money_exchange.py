@@ -36,6 +36,7 @@ if _IS_LINUX:
 
 import tkinter as tk
 import tkinter.font as tkfont
+from tkinter import messagebox
 
 from display_config import DISPLAY_HEIGHT, DISPLAY_WIDTH, ch, cw, fs, px
 from screensaver import ScreenSaverConfig, ScreenSaverController
@@ -97,6 +98,7 @@ class MoneyExchanger:
         self.restart_hotspot_clicks = 0
         self.admin_password = "2857"
         self.is_acceptor_disabled = False
+        self._git_pull_in_progress = False
         # Linux 기본 폰트(라즈비안 포함), Windows는 맑은고딕
         self.font_family = "DejaVu Sans" if _IS_LINUX else "Malgun Gothic"
         self.custom_font_family = self.font_family
@@ -759,21 +761,39 @@ class MoneyExchanger:
         btn = getattr(self, "btn_admin_git_update", None)
         self._git_pull_and_restart(admin_btn=btn)
 
+    def _git_subprocess_env(self):
+        env = os.environ.copy()
+        env.setdefault("HOME", os.path.expanduser("~"))
+        env["PATH"] = env.get("PATH", "") + os.pathsep + "/usr/local/bin:/usr/bin:/bin"
+        return env
+
     def _git_pull_and_restart(self, *, admin_btn=None, scheduled=False):
+        if self._git_pull_in_progress:
+            return
+        self._git_pull_in_progress = True
         if not scheduled:
             self.sound.play_sound("button", wait=False)
         if admin_btn and admin_btn.winfo_exists():
             admin_btn.config(state=tk.DISABLED, text="업데이트 중...")
-        result_holder = {"scheduled": scheduled}
+        result_holder = {"scheduled": scheduled, "admin": admin_btn is not None}
+        self._log_git_update(f"git pull 시작 (scheduled={scheduled})")
 
         def do_pull():
             try:
                 r = subprocess.run(
-                    ["git", "pull", "origin", "main"],
+                    [
+                        "git",
+                        "-c",
+                        f"safe.directory={_PROJECT_ROOT}",
+                        "pull",
+                        "origin",
+                        "main",
+                    ],
                     cwd=_PROJECT_ROOT,
                     capture_output=True,
                     text=True,
                     timeout=120,
+                    env=self._git_subprocess_env(),
                 )
                 result_holder["returncode"] = r.returncode
                 result_holder["stdout"] = r.stdout or ""
@@ -797,7 +817,7 @@ class MoneyExchanger:
 
         threading.Thread(target=do_pull, daemon=True).start()
 
-    def _log_scheduled_git_update(self, message):
+    def _log_git_update(self, message):
         log_path = os.path.join(_PROJECT_ROOT, "git_update.log")
         try:
             with open(log_path, "a", encoding="utf-8") as f:
@@ -805,29 +825,43 @@ class MoneyExchanger:
         except OSError:
             pass
 
+    def _log_scheduled_git_update(self, message):
+        self._log_git_update(message)
+
     def _on_git_pull_done(self, result_holder, btn):
+        self._git_pull_in_progress = False
         ok = result_holder.get("returncode", -1) == 0
         scheduled = result_holder.get("scheduled", False)
+        stdout = result_holder.get("stdout", "").strip()
+        stderr = result_holder.get("stderr", "").strip()
         if ok:
             if btn and btn.winfo_exists():
                 btn.config(text="재시작합니다...")
-            if scheduled:
-                self._log_scheduled_git_update("git pull 성공, 재시작합니다.")
+            detail = stdout or stderr or "성공"
+            self._log_git_update(f"git pull 성공: {detail}")
             self.root.after(1500, self._do_restart_after_pull)
         else:
             if btn and btn.winfo_exists():
                 btn.config(state=tk.NORMAL, text="Git 업데이트 후 재시작")
-            err = result_holder.get("stderr", "").strip() or result_holder.get("stdout", "").strip() or "알 수 없는 오류"
-            if scheduled:
-                self._log_scheduled_git_update(f"git pull 실패: {err}")
-            else:
+            err = stderr or stdout or "알 수 없는 오류"
+            self._log_git_update(f"git pull 실패: {err}")
+            if not scheduled or result_holder.get("admin"):
                 try:
-                    tk.messagebox.showerror("Git 업데이트 실패", err, parent=self.root)
+                    messagebox.showerror("Git 업데이트 실패", err, parent=self.root)
                 except Exception:
                     pass
 
     def _restart_app(self):
         """현재 앱 종료 후 동일 스크립트를 새 프로세스로 실행."""
+        popen_kwargs = {
+            "cwd": _PROJECT_ROOT,
+            "env": self._git_subprocess_env(),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if _IS_LINUX:
+            popen_kwargs["start_new_session"] = True
         try:
             subprocess.Popen(
                 [
@@ -835,13 +869,16 @@ class MoneyExchanger:
                     os.path.abspath(__file__),
                     _SKIP_BOOT_GIT_UPDATE_ARG,
                 ],
-                cwd=_PROJECT_ROOT,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                **popen_kwargs,
             )
-        except Exception:
-            pass
+            self._log_git_update("앱 재시작 프로세스 시작")
+        except Exception as e:
+            self._log_git_update(f"앱 재시작 실패: {e}")
+            try:
+                messagebox.showerror("재시작 실패", str(e), parent=self.root)
+            except Exception:
+                pass
+            return
         self.root.quit()
         sys.exit(0)
 

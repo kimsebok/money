@@ -2,8 +2,8 @@
 Version=1.0
 Type=Application
 Name=지폐 교환기 (부팅 시 자동실행)
-Comment=부팅 시 지폐 교환기 자동 실행 (앱 시작 5초 후 git 업데이트)
-Exec=python3 /home/se/money/money_exchange.py
+Comment=install_autostart.sh 실행 시 ~/.config/autostart/ 에 실제 경로로 생성됩니다
+Exec=/home/se/money/launch_money_exchange.sh
 Path=/home/se/money
 Icon=python3
 Terminal=false
